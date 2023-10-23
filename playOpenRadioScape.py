@@ -1,69 +1,53 @@
-import sys
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.backends.backend_tkagg
-from scipy import signal
-from sklearn import preprocessing
-from rtlsdr import RtlSdr
 import pygame
-import pygame.freetype
-import tkinter as tk
+import rtlsdr
 
-# Initialize pygame
+# Initialize Pygame and set up the game window
 pygame.init()
+screen = pygame.display.set_mode((800, 600))
 
-# Set the window size and title
-window_size = (600, 400)
-window_title = 'Signal Analyzer'
+# Set up the player character
+player_image = pygame.image.load("player.png")
+player_rect = player_image.get_rect()
 
-# Create the window
-screen = pygame.display.set_mode(window_size)
-pygame.display.set_caption(window_title)
+# Set up the RTL-SDR
+sdr = rtlsdr.RtlSdr()
+sdr.center_freq = 100e6
+sdr.sample_rate = 2.4e6
+sdr.gain = 'auto'
+sdr.read_samples()
 
-# Set the font and font size
-font = pygame.freetype.Font(None, 24)
+# Set up the game world
+world_image = pygame.image.load("world.png")
+world_rect = world_image.get_rect()
 
-# Set the SDR sample rate and frequency
-sdr = RtlSdr()
-sdr.sample_rate = 2.4e6  # 2.4 MHz
-sdr.center_freq = 100e6  # 100 MHz
+# Set up the "SDR zone" where the player can use the RTL-SDR
+sdr_zone_rect = pygame.Rect(200, 200, 400, 200)
 
-# Set the number of samples to capture
-num_samples = 2**15
+# Main game loop
+while True:
+    # Handle player input
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.KEYDOWN:
+            # Move the player character based on key presses
+            if event.key == pygame.K_LEFT:
+                player_rect.x -= 5
+            elif event.key == pygame.K_RIGHT:
+                player_rect.x += 5
+            elif event.key == pygame.K_UP:
+                player_rect.y -= 5
+            elif event.key == pygame.K_DOWN:
+                player_rect.y += 5
 
-def main():
-    # Set the background color
-    screen.fill((255, 255, 255))
+    # Check if the player is in the "SDR zone"
+    if player_rect.colliderect(sdr_zone_rect):
+        # If the player is in the SDR zone, call the SDR code
+        sdr_data = sdr.read_samples(1024)
+        do_something_with_sdr_data(sdr_data)
 
-    # Draw the signal type selection buttons
-    fsk_button = pygame.Rect(50, 50, 200, 50)
-    qam_button = pygame.Rect(300, 50, 200, 50)
-    pygame.draw.rect(screen, (200, 200, 200), fsk_button)
-    pygame.draw.rect(screen, (200, 200, 200), qam_button)
-    font.render_to(screen, (80, 70), 'FSK', (0, 0, 0))
-    font.render_to(screen, (330, 70), 'QAM', (0, 0, 0))
-
-    # Update the display
+    # Render the game world and player character to the screen
+    screen.blit(world_image, world_rect)
+    screen.blit(player_image, player_rect)
     pygame.display.flip()
-
-    # Wait for a button to be clicked
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # Get the mouse position
-                mouse_pos = pygame.mouse.get_pos()
-
-                # Check if the FSK button was clicked
-                if fsk_button.collidepoint(mouse_pos):
-                    # Read samples from the SDR
-                    samples = sdr.read_samples(num_samples)
-
-                    # Estimate the symbol rate of the FSK signal using the autocorrelation function
-                    autocorr = signal.correlate(samples, samples, mode='full')
-                    autocorr = autocorr[autocorr.size//2:]
-                    autocorr /= np.max(autocorr)
-                    symbols_per_second = sdr.sample_rate / signal.argmax(autocorr)
-                    print(f'Estimated symbol rate: {sy
